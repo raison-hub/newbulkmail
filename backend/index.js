@@ -25,7 +25,9 @@ const credential = mongoose.model(
   ),
   "newbulkmail"
 );
-
+app.get("/", (req, res) => {
+  res.send("Bulk Mail Backend is Running!");
+});
 app.post("/sendemail", async (req, res) => {
   const { msg, emailList = [] } = req.body;
 
@@ -77,3 +79,4 @@ app.listen(5000, () => {
   console.log("server started");
 });
 }
+module.exports = app;
