@@ -9,10 +9,22 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-mongoose
-  .connect("mongodb://john:john12345@cluster0-shard-00-00.o1rfi1z.mongodb.net:27017,cluster0-shard-00-01.o1rfi1z.mongodb.net:27017,cluster0-shard-00-02.o1rfi1z.mongodb.net:27017/bulkmail?ssl=true&replicaSet=atlas-xxxxxx-shard-0&authSource=admin&retryWrites=true&w=majority")
-  .then(() => console.log("connected to db"))
-  .catch((err) => console.log("failed to connect", err));
+
+
+  const MONGO_URI =
+  "mongodb+srv://bulkmail:bulkmail12345@cluster0.pneg6fo.mongodb.net/bulkmail?retryWrites=true&w=majority&appName=Cluster0";
+
+let isConnected = false;
+async function connectDB() {
+  if (isConnected || mongoose.connection.readyState >= 1) {
+    return;
+  }
+  await mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+  });
+  isConnected = true;
+  console.log("Connected to MongoDB Atlas");
+}
 
 const credential = mongoose.model(
   "credential",
@@ -34,7 +46,8 @@ app.post("/sendemail", async (req, res) => {
   const { msg, emailList = [] } = req.body;
 
   try {
-    // Specifically finds the document that contains the password field
+    await connectDB();
+
     const creds = await credential.findOne({ password: { $exists: true } });
 
     if (!creds || !creds.user || !creds.password) {
@@ -55,7 +68,7 @@ app.post("/sendemail", async (req, res) => {
       service: "gmail",
       auth: {
         user: creds.user,
-        pass: creds.password.replace(/\s+/g, ""), // strips any accidental spaces
+        pass: creds.password.replace(/\s+/g, ""),
       },
     });
 
