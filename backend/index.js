@@ -10,7 +10,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 mongoose
-  .connect("mongodb://john:john12345@ac-mxhtyrz-shard-00-00.o1rfi1z.mongodb.net:27017,ac-mxhtyrz-shard-00-01.o1rfi1z.mongodb.net:27017,ac-mxhtyrz-shard-00-02.o1rfi1z.mongodb.net:27017/passkey?ssl=true&replicaSet=atlas-l4vk5h-shard-0&authSource=admin&appName=Cluster0")
+  .connect("mongodb://john:john12345@cluster0-shard-00-00.o1rfi1z.mongodb.net:27017,cluster0-shard-00-01.o1rfi1z.mongodb.net:27017,cluster0-shard-00-02.o1rfi1z.mongodb.net:27017/bulkmail?ssl=true&replicaSet=atlas-xxxxxx-shard-0&authSource=admin&retryWrites=true&w=majority")
   .then(() => console.log("connected to db"))
   .catch((err) => console.log("failed to connect", err));
 
@@ -23,24 +23,25 @@ const credential = mongoose.model(
     },
     { strict: false }
   ),
-  "newbulkmail"
+  "mails"
 );
+
 app.get("/", (req, res) => {
   res.send("Bulk Mail Backend is Running!");
 });
+
 app.post("/sendemail", async (req, res) => {
   const { msg, emailList = [] } = req.body;
 
   try {
-    const data = await credential.find();
-    if (!data || data.length === 0) {
-      console.error("No credentials document found in MongoDB.");
+    // Specifically finds the document that contains the password field
+    const creds = await credential.findOne({ password: { $exists: true } });
+
+    if (!creds || !creds.user || !creds.password) {
+      console.error("No valid credentials document found in MongoDB.");
       return res.status(500).send(false);
     }
 
-    const creds = data[0].toObject ? data[0].toObject() : data[0];
-
-    
     const validEmails = emailList.filter(
       (email) => email && typeof email === "string" && email.includes("@")
     );
@@ -54,7 +55,7 @@ app.post("/sendemail", async (req, res) => {
       service: "gmail",
       auth: {
         user: creds.user,
-        pass: creds.password,
+        pass: creds.password.replace(/\s+/g, ""), // strips any accidental spaces
       },
     });
 
@@ -74,9 +75,11 @@ app.post("/sendemail", async (req, res) => {
     res.send(false);
   }
 });
+
 if (process.env.NODE_ENV !== "production") {
-app.listen(5000, () => {
-  console.log("server started");
-});
+  app.listen(5000, () => {
+    console.log("server started");
+  });
 }
+
 module.exports = app;
